@@ -1,177 +1,152 @@
-/*
- * GLUT Shapes Demo
- *
- * Written by Nigel Stewart November 2003
- *
- * This program is test harness for the sphere, cone
- * and torus shapes in GLUT.
- *
- * Spinning wireframe and smooth shaded shapes are
- * displayed until the ESC or q key is pressed.  The
- * number of geometry stacks and slices can be adjusted
- * using the + and - keys.
- */
-
-#ifdef __APPLE__
-#include <GLUT/glut.h>
-#else
 #include <GL/glut.h>
-#endif
+#include <cmath>
+#include <algorithm>
 
-#include <stdlib.h>
+// --------------------------- Canvas / Timing ---------------------------
+static const int W = 1000;
+static const int H = 600;
 
-static int slices = 16;
-static int stacks = 16;
+static const int TIMER_MS = 16;   // ~60 FPS
+static const float DT = 0.016f;
 
-/* GLUT callback Handlers */
+// --------------------------- Modes ---------------------------
+static bool gNight = false;
 
-static void resize(int width, int height)
+// --------------------------- Utility ---------------------------
+static inline int iround(float x) { return (int)std::lround(x); }
+
+// Plot a point (used by custom algorithms)
+static void plotPoint(int x, int y)
 {
-    const float ar = (float) width / (float) height;
-
-    glViewport(0, 0, width, height);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glFrustum(-ar, ar, -1.0, 1.0, 2.0, 100.0);
-
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity() ;
+    glVertex2i(x, y);
 }
 
-static void display(void)
+// --------------------------- DDA Line Algorithm ---------------------------
+static void lineDDA(float x1, float y1, float x2, float y2)
 {
-    const double t = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-    const double a = t*90.0;
+    float dx = x2 - x1;
+    float dy = y2 - y1;
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glColor3d(1,0,0);
+    float steps = std::max(std::fabs(dx), std::fabs(dy));
+    if (steps < 1.0f) steps = 1.0f;
 
-    glPushMatrix();
-        glTranslated(-2.4,1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutSolidSphere(1,slices,stacks);
-    glPopMatrix();
+    float xInc = dx / steps;
+    float yInc = dy / steps;
 
-    glPushMatrix();
-        glTranslated(0,1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutSolidCone(1,1,slices,stacks);
-    glPopMatrix();
+    float x = x1;
+    float y = y1;
 
-    glPushMatrix();
-        glTranslated(2.4,1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutSolidTorus(0.2,0.8,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(-2.4,-1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutWireSphere(1,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(0,-1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutWireCone(1,1,slices,stacks);
-    glPopMatrix();
-
-    glPushMatrix();
-        glTranslated(2.4,-1.2,-6);
-        glRotated(60,1,0,0);
-        glRotated(a,0,0,1);
-        glutWireTorus(0.2,0.8,slices,stacks);
-    glPopMatrix();
-
-    glutSwapBuffers();
-}
-
-
-static void key(unsigned char key, int x, int y)
-{
-    switch (key)
+    for (int i = 0; i <= (int)steps; i++)
     {
-        case 27 :
-        case 'q':
-            exit(0);
-            break;
-
-        case '+':
-            slices++;
-            stacks++;
-            break;
-
-        case '-':
-            if (slices>3 && stacks>3)
-            {
-                slices--;
-                stacks--;
-            }
-            break;
+        plotPoint(iround(x), iround(y));
+        x += xInc;
+        y += yInc;
     }
-
-    glutPostRedisplay();
 }
 
-static void idle(void)
+// --------------------------- Bresenham Line Algorithm ---------------------------
+static void lineBresenham(int x1, int y1, int x2, int y2)
 {
-    glutPostRedisplay();
+    int dx = std::abs(x2 - x1);
+    int dy = std::abs(y2 - y1);
+
+    int sx = (x1 < x2) ? 1 : -1;
+    int sy = (y1 < y2) ? 1 : -1;
+
+    int err = dx - dy;
+
+    while (true)
+    {
+        plotPoint(x1, y1);
+        if (x1 == x2 && y1 == y2) break;
+
+        int e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x1 += sx; }
+        if (e2 <  dx) { err += dx; y1 += sy; }
+    }
 }
 
-const GLfloat light_ambient[]  = { 0.0f, 0.0f, 0.0f, 1.0f };
-const GLfloat light_diffuse[]  = { 1.0f, 1.0f, 1.0f, 1.0f };
-const GLfloat light_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-const GLfloat light_position[] = { 2.0f, 5.0f, 5.0f, 0.0f };
-
-const GLfloat mat_ambient[]    = { 0.7f, 0.7f, 0.7f, 1.0f };
-const GLfloat mat_diffuse[]    = { 0.8f, 0.8f, 0.8f, 1.0f };
-const GLfloat mat_specular[]   = { 1.0f, 1.0f, 1.0f, 1.0f };
-const GLfloat high_shininess[] = { 100.0f };
-
-/* Program entry point */
-
-int main(int argc, char *argv[])
+// --------------------------- Midpoint Circle Algorithm ---------------------------
+static void circleMidpoint(int xc, int yc, int r)
 {
-    glutInit(&argc, argv);
-    glutInitWindowSize(640,480);
-    glutInitWindowPosition(10,10);
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+    int x = 0;
+    int y = r;
+    int d = 1 - r;
 
-    glutCreateWindow("GLUT Shapes");
+    auto plot8 = [&](int px, int py)
+    {
+        plotPoint(xc + px, yc + py);
+        plotPoint(xc - px, yc + py);
+        plotPoint(xc + px, yc - py);
+        plotPoint(xc - px, yc - py);
+        plotPoint(xc + py, yc + px);
+        plotPoint(xc - py, yc + px);
+        plotPoint(xc + py, yc - px);
+        plotPoint(xc - py, yc - px);
+    };
 
-    glutReshapeFunc(resize);
-    glutDisplayFunc(display);
-    glutKeyboardFunc(key);
-    glutIdleFunc(idle);
+    plot8(x, y);
 
-    glClearColor(1,1,1,1);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
+    while (x < y)
+    {
+        x++;
+        if (d < 0)
+        {
+            d += 2 * x + 1;
+        }
+        else
+        {
+            y--;
+            d += 2 * (x - y) + 1;
+        }
+        plot8(x, y);
+    }
+}
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
+// --------------------------- Drawing Helpers ---------------------------
+static void setColor(float r, float g, float b)
+{
+    glColor3f(r, g, b);
+}
 
-    glEnable(GL_LIGHT0);
-    glEnable(GL_NORMALIZE);
-    glEnable(GL_COLOR_MATERIAL);
-    glEnable(GL_LIGHTING);
+static void rectFilled(float x, float y, float w, float h)
+{
+    glBegin(GL_QUADS);
+    glVertex2f(x, y);
+    glVertex2f(x + w, y);
+    glVertex2f(x + w, y + h);
+    glVertex2f(x, y + h);
+    glEnd();
+}
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT,  light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE,  light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+static void rectOutline(float x, float y, float w, float h)
+{
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x, y);
+    glVertex2f(x + w, y);
+    glVertex2f(x + w, y + h);
+    glVertex2f(x, y + h);
+    glEnd();
+}
 
-    glMaterialfv(GL_FRONT, GL_AMBIENT,   mat_ambient);
-    glMaterialfv(GL_FRONT, GL_DIFFUSE,   mat_diffuse);
-    glMaterialfv(GL_FRONT, GL_SPECULAR,  mat_specular);
-    glMaterialfv(GL_FRONT, GL_SHININESS, high_shininess);
+// Use algorithms to draw a rectangle outline with Bresenham (pixel lines)
+static void rectOutlineBresenham(int x, int y, int w, int h)
+{
+    glBegin(GL_POINTS);
+    lineBresenham(x, y, x + w, y);
+    lineBresenham(x + w, y, x + w, y + h);
+    lineBresenham(x + w, y + h, x, y + h);
+    lineBresenham(x, y + h, x, y);
+    glEnd();
+}
 
-    glutMainLoop();
-
-    return EXIT_SUCCESS;
+// Use algorithms to draw a rectangle outline with DDA (pixel lines)
+static void rectOutlineDDA(int x, int y, int w, int h)
+{
+    glBegin(GL_POINTS);
+    lineDDA((float)x, (float)y, (float)(x + w), (float)y);
+    lineDDA((float)(x + w), (float)y, (float)(x + w), (float)(y + h));
+    lineDDA((float)(x + w), (float)(y + h), (float)x, (float)(y + h));
+    lineDDA((float)x, (float)(y + h), (float)x, (float)y);
+    glEnd();
 }
