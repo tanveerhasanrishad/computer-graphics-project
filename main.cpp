@@ -204,3 +204,41 @@ static void drawBuildings()
         glPopMatrix();
     }
 }
+
+
+// Sun / Moon using midpoint circle
+static void drawSunMoon()
+{
+    glPointSize(2.0f);
+    glBegin(GL_POINTS);
+    if (!gNight)
+    {
+        setColor(1.0f, 0.85f, 0.20f);
+        circleMidpoint(880, 520, 35);
+    }
+    else
+    {
+        setColor(0.90f, 0.90f, 0.95f);
+        circleMidpoint(880, 520, 30);
+        // Crescent effect (simple)
+        setColor(0.10f, 0.10f, 0.15f);
+        circleMidpoint(892, 528, 26);
+    }
+    glEnd();
+}
+
+// Cloud made from 3 circles + a base (translation used externally)
+static void drawCloud()
+{
+    if (!gNight) setColor(1.0f, 1.0f, 1.0f);
+    else         setColor(0.75f, 0.78f, 0.85f);
+
+    rectFilled(-35, -10, 90, 22);
+
+    glPointSize(2.0f);
+    glBegin(GL_POINTS);
+    circleMidpoint(-20,  2, 18);
+    circleMidpoint(  5, 10, 22);
+    circleMidpoint( 30,  2, 18);
+    glEnd();
+}
