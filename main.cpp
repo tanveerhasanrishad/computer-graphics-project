@@ -150,3 +150,57 @@ static void rectOutlineDDA(int x, int y, int w, int h)
     lineDDA((float)x, (float)(y + h), (float)x, (float)y);
     glEnd();
 }
+
+// --------------------------- Scene Objects ---------------------------
+
+// Background buildings (scaled + DDA outlines)
+static void drawBuildings()
+{
+    // Buildings base layer
+    struct B { float x, y, w, h, s; };
+    B bs[] = {
+        {  40, 230, 120, 170, 1.0f },
+        { 180, 230,  90, 140, 1.0f },
+        { 290, 230, 140, 190, 1.0f },
+        { 460, 230, 110, 160, 1.0f },
+        { 590, 230, 160, 210, 1.0f },
+        { 780, 230, 120, 175, 1.0f }
+    };
+
+    for (auto &b : bs)
+    {
+        glPushMatrix();
+        glTranslatef(b.x, b.y, 0);
+        glScalef(b.s, b.s, 1.0f); // Scaling (required)
+
+        // Fill
+        if (!gNight) setColor(0.78f, 0.80f, 0.86f);
+        else         setColor(0.15f, 0.17f, 0.22f);
+        rectFilled(0, 0, b.w, b.h);
+
+        // Outline using DDA (required)
+        if (!gNight) setColor(0.30f, 0.35f, 0.45f);
+        else         setColor(0.65f, 0.70f, 0.80f);
+        rectOutlineDDA(0, 0, (int)b.w, (int)b.h);
+
+        // Windows
+        int cols = 4, rows = 5;
+        float wx = b.w / (cols + 1);
+        float wy = b.h / (rows + 1);
+        for (int r = 1; r <= rows; r++)
+        {
+            for (int c = 1; c <= cols; c++)
+            {
+                float px = c * wx - 10;
+                float py = r * wy - 8;
+                float ww = 18, wh = 14;
+
+                if (!gNight) setColor(0.55f, 0.70f, 0.90f);
+                else         setColor(0.95f, 0.85f, 0.40f); // warm lights at night
+                rectFilled(px, py, ww, wh);
+            }
+        }
+
+        glPopMatrix();
+    }
+}
